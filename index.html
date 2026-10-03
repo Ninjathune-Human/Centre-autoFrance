@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Centres d'entretien auto, France</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --font-system:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Segoe UI",system-ui,sans-serif;
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;
+  --radius-md:12px;--radius-lg:16px;--radius-xl:20px;--radius-full:9999px;
+  --ease:cubic-bezier(0.25,0.1,0.25,1);--fast:150ms;--medium:250ms;
+  --accent:#007AFF;
+  --label:rgba(0,0,0,1);--label-2:rgba(0,0,0,.6);--label-3:rgba(0,0,0,.3);--fill:rgba(0,0,0,.06);
+  --panel:#FFFFFF;--bg:#F2F2F7;--stroke:#FFFFFF;
+}
+@media (prefers-color-scheme:dark){:root{
+  --accent:#0A84FF;
+  --label:rgba(255,255,255,1);--label-2:rgba(255,255,255,.6);--label-3:rgba(255,255,255,.3);--fill:rgba(255,255,255,.08);
+  --panel:#1C1C1E;--bg:#000000;--stroke:#1C1C1E;
+}}
+html,body{height:100%;margin:0}
+body{font-family:var(--font-system);color:var(--label);background:var(--bg);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#map{position:fixed;inset:0}
+
+.glass{
+  background:color-mix(in srgb,var(--panel) 80%,transparent);
+  backdrop-filter:blur(20px) saturate(1.8);-webkit-backdrop-filter:blur(20px) saturate(1.8);
+  border:.5px solid color-mix(in srgb,var(--label) 12%,transparent);
+  box-shadow:0 8px 32px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.08);
+}
+@media (prefers-reduced-transparency:reduce){.glass{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}}
+
+#panel{
+  position:fixed;z-index:1000;box-sizing:border-box;
+  top:calc(16px + env(safe-area-inset-top));left:calc(16px + env(safe-area-inset-left));
+  width:340px;max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;padding:var(--space-2);border-radius:var(--radius-xl);
+}
+.head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-1) 0 var(--space-2) var(--space-3)}
+h1{font-size:1.0625rem;font-weight:600;margin:0;letter-spacing:-.01em}
+#status{font-size:.8125rem;color:var(--label-2);margin:2px 0 0}
+#status button{color:var(--accent);font-weight:600;padding:0;margin-left:4px}
+.icon{flex:none;width:44px;height:44px;border-radius:var(--radius-full);display:grid;place-items:center;color:var(--label-2);transition:background var(--fast) var(--ease)}
+.icon:hover{background:var(--fill)}
+#toggle svg{transition:transform var(--fast) var(--ease)}
+.collapsed #toggle svg{transform:rotate(180deg)}
+
+.search{display:flex;align-items:center;height:44px;padding:0 0 0 var(--space-3);border-radius:var(--radius-md);background:var(--fill);color:var(--label-2)}
+.search:focus-within{box-shadow:0 0 0 2px var(--accent)}
+.search input{flex:1;min-width:0;height:100%;border:0;outline:0;background:none;color:var(--label);font:1.0625rem var(--font-system);padding:0 var(--space-2)}
+.search input::placeholder{color:var(--label-3)}
+#clear{width:36px;height:36px;margin-right:4px}
+
+#results{margin-top:var(--space-1);overflow:auto;min-height:0;flex:0 1 auto}
+#results p{margin:0;padding:var(--space-2) var(--space-3);font-size:.8125rem;color:var(--label-2)}
+.res{display:grid;grid-template-columns:10px 1fr;column-gap:var(--space-3);align-items:center;width:100%;min-height:44px;padding:6px var(--space-3);border-radius:var(--radius-md);text-align:left;box-sizing:border-box}
+.res b{font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res small{grid-column:2;font-size:.8125rem;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res.sel,.res:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+
+.wrap{display:grid;grid-template-rows:1fr;min-height:0;flex:0 1 auto;transition:grid-template-rows var(--medium) var(--ease)}
+.collapsed .wrap{grid-template-rows:0fr}
+#brands{list-style:none;margin:var(--space-1) 0 0;padding:0;min-height:0;overflow:auto}
+#brands button{display:grid;grid-template-columns:10px 1fr auto;gap:var(--space-3);align-items:center;width:100%;min-height:44px;padding:0 var(--space-3);border-radius:var(--radius-md);text-align:left;font-size:1rem;transition:opacity var(--fast) var(--ease),background var(--fast) var(--ease)}
+#brands button:hover{background:var(--fill)}
+#brands button[aria-pressed=true]{background:var(--fill);font-weight:600}
+.filtering #brands button[aria-pressed=false]{opacity:.38}
+.ct{font-size:.9375rem;color:var(--label-2);font-variant-numeric:tabular-nums;font-weight:400}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px var(--stroke),0 0 0 2px color-mix(in srgb,var(--label) 15%,transparent)}
+.src{margin:var(--space-2) var(--space-3) var(--space-1);font-size:.6875rem;color:var(--label-2)}
+.src a{color:inherit}
+
+@media (max-width:640px){#panel{right:calc(16px + env(safe-area-inset-right));width:auto}}
+
+/* Leaflet */
+.leaflet-container{font-family:var(--font-system);background:var(--bg)}
+.leaflet-bottomright{margin-right:env(safe-area-inset-right);margin-bottom:env(safe-area-inset-bottom)}
+.leaflet-bar{border:0!important;border-radius:var(--radius-md)!important;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.08)!important}
+.leaflet-bar a{width:44px!important;height:44px!important;line-height:44px!important;background:var(--panel)!important;color:var(--label)!important;border-bottom-color:var(--fill)!important}
+.leaflet-control-attribution{background:color-mix(in srgb,var(--panel) 80%,transparent)!important;color:var(--label-2);font-size:.6875rem;border-radius:var(--radius-md) 0 0 0}
+.leaflet-control-attribution a{color:var(--accent)}
+.leaflet-popup-content-wrapper{border-radius:var(--radius-lg);background:var(--panel);color:var(--label);box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.leaflet-popup-tip{background:var(--panel)}
+.leaflet-popup-content{margin:var(--space-4);font-size:.9375rem;line-height:1.35}
+.leaflet-container a.leaflet-popup-close-button{width:44px;height:44px;font:22px/44px var(--font-system);color:var(--label-2)}
+.card .brand{display:flex;align-items:center;gap:var(--space-2);font-size:.8125rem;color:var(--label-2);margin-right:28px}
+.card h2{font-size:1.0625rem;font-weight:600;margin:var(--space-1) 28px var(--space-2) 0}
+.card .addr{margin:0 0 var(--space-3)}
+.card dl{display:grid;grid-template-columns:auto 1fr;gap:6px var(--space-3);margin:0 0 var(--space-3);font-size:.875rem}
+.card dt{color:var(--label-2)}
+.card dd{margin:0;overflow-wrap:anywhere}
+.card a{color:var(--accent)}
+.card .go{display:inline-flex;align-items:center;min-height:44px;padding:0 20px;border-radius:var(--radius-full);background:var(--accent);color:#fff;font-weight:600;text-decoration:none}
+
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<section id="panel" class="glass" aria-label="Recherche et enseignes">
+  <header class="head">
+    <div>
+      <h1>Centres d'entretien auto</h1>
+      <p id="status" aria-live="polite">Chargement…</p>
+    </div>
+    <button id="toggle" class="icon" aria-expanded="true" aria-controls="brands" aria-label="Replier la liste des enseignes">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>
+    </button>
+  </header>
+  <div class="search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="text" enterkeyhint="search" autocomplete="off" spellcheck="false" placeholder="Enseigne, ville, code postal" aria-label="Rechercher un centre" aria-controls="results">
+    <button id="clear" class="icon" aria-label="Effacer la recherche" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div id="results" role="listbox" hidden></div>
+  <div class="wrap"><ul id="brands"></ul></div>
+  <p class="src">Données © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">contributeurs OpenStreetMap</a>, licence ODbL</p>
+</section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const BRANDS = [
+  ['Norauto',     /norauto/,                '#1E5AA8'],
+  ['Feu Vert',    /feu ?vert/,              '#2E8B57'],
+  ['Speedy',      /speedy/,                 '#E0A100'],
+  ['Midas',       /midas/,                  '#D9480F'],
+  ['Point S',     /point s( |$)/,           '#C2185B'],
+  ['Euromaster',  /euromaster/,             '#00838F'],
+  ['Vulco',       /vulco/,                  '#6A4C93'],
+  ['Profil Plus', /profil( ?plus|\+)/,      '#8D6E63'],
+  ['Roady',       /roady/,                  '#E53935'],
+  ['Carter-Cash', /carter.?cash/,           '#455A64'],
+  ['Eurorepar',   /eurorepar/,              '#7CB342'],
+  ['Motrio',      /motrio/,                 '#F06292'],
+  ['Top Garage',  /top ?garage/,            '#5C6BC0']
+].map(([name, re, color]) => ({ name, re, color }));
+
+const RX = 'Norauto|Feu ?Vert|Speedy|Midas|Point S( |$)|Euromaster|Vulco|Profil( ?Plus|[+])|Roady|Carter.?Cash|Eurorepar|Motrio|Top ?Garage';
+const QUERY = `[out:json][timeout:180];
+area["ISO3166-1"="FR"][admin_level=2]->.fr;
+(
+  nwr["brand"~"${RX}",i](area.fr);
+  nwr["shop"~"^(car_repair|tyres|car_parts|car)$"]["name"~"${RX}",i](area.fr);
+);
+out center tags;`;
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
+const CACHE = 'centres-auto-fr-v1', WEEK = 7 * 864e5;
+
+const $ = id => document.getElementById(id);
+const panel = $('panel'), statusEl = $('status'), q = $('q'), clearBtn = $('clear'), resultsEl = $('results'), brandsEl = $('brands'), toggle = $('toggle');
+const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => n.toLocaleString('fr-FR');
+const dark = matchMedia('(prefers-color-scheme: dark)');
+
+/* Carte */
+const map = L.map('map', { zoomControl: false, attributionControl: false, minZoom: 3 }).fitBounds([[41.3, -5.2], [51.1, 9.6]]);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+L.control.attribution({ prefix: '<a href="https://leafletjs.com">Leaflet</a>' }).addTo(map);
+const renderer = L.canvas({ padding: .5, tolerance: 8 });
+const layer = L.layerGroup().addTo(map);
+let tiles = [];
+function setTiles() {
+  tiles.forEach(t => map.removeLayer(t));
+  const v = dark.matches ? 'Dark' : 'Light', base = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_' + v + '_Gray_';
+  const opt = { maxNativeZoom: 16, maxZoom: 19 };
+  tiles = [
+    L.tileLayer(base + 'Base/MapServer/tile/{z}/{y}/{x}', { ...opt, attribution: 'Fond © Esri, HERE, Garmin' }),
+    L.tileLayer(base + 'Reference/MapServer/tile/{z}/{y}/{x}', opt)
+  ];
+  tiles.forEach(t => t.addTo(map));
+  const stroke = getComputedStyle(document.documentElement).getPropertyValue('--stroke').trim();
+  ALL.forEach(it => it.m.setStyle({ color: stroke }));
+}
+const radius = () => { const z = map.getZoom(); return z <= 6 ? 3 : z <= 9 ? 4.5 : 6.5; };
+map.on('zoomend', () => { const r = radius(); ALL.forEach(it => it.m.setRadius(r)); });
+
+/* Données */
+let ALL = [];
+const active = new Set();
+
+function parse(json) {
+  const out = [];
+  for (const e of json.elements) {
+    const t = e.tags || {}, lat = e.lat ?? e.center?.lat, lng = e.lon ?? e.center?.lon;
+    if (lat == null) continue;
+    let b = BRANDS.findIndex(x => x.re.test(norm(t.brand)));
+    if (b < 0) b = BRANDS.findIndex(x => x.re.test(norm(t.name)));
+    if (b < 0) continue;
+    out.push({
+      lat, lng, b,
+      n: t.name || BRANDS[b].name,
+      s: [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' '),
+      p: t['addr:postcode'] || '', c: t['addr:city'] || '',
+      tel: t.phone || t['contact:phone'] || '',
+      web: t.website || t['contact:website'] || '',
+      mail: t.email || t['contact:email'] || '',
+      h: t.opening_hours || '', siret: t['ref:FR:SIRET'] || ''
+    });
+  }
+  return out;
+}
+
+async function load() {
+  statusEl.textContent = 'Interrogation d\u2019OpenStreetMap, jusqu\u2019à une minute la première fois…';
+  let items = null;
+  try { const c = JSON.parse(localStorage.getItem(CACHE)); if (c && Date.now() - c.t < WEEK) items = c.items; } catch {}
+  if (!items) {
+    try {
+      const r = await fetch(OVERPASS, { method: 'POST', body: new URLSearchParams({ data: QUERY }) });
+      if (!r.ok) throw new Error(r.status);
+      items = parse(await r.json());
+      try { localStorage.setItem(CACHE, JSON.stringify({ t: Date.now(), items })); } catch {}
+    } catch {
+      statusEl.innerHTML = 'OpenStreetMap n\u2019a pas répondu.<button id="retry">Réessayer</button>';
+      $('retry').onclick = load;
+      return;
+    }
+  }
+  build(items);
+}
+
+function build(items) {
+  const stroke = getComputedStyle(document.documentElement).getPropertyValue('--stroke').trim(), r = radius();
+  ALL = items;
+  for (const it of ALL) {
+    it.tok = words(`${it.n} ${BRANDS[it.b].name} ${it.s} ${it.p} ${it.c}`);
+    it.m = L.circleMarker([it.lat, it.lng], { renderer, radius: r, color: stroke, weight: 1.5, fillColor: BRANDS[it.b].color, fillOpacity: 1 })
+      .bindPopup(() => card(it), { minWidth: 240, maxWidth: 300 });
+  }
+  const counts = BRANDS.map((_, i) => ALL.filter(it => it.b === i).length);
+  brandsEl.innerHTML = BRANDS.map((b, i) => ({ b, i, n: counts[i] })).filter(x => x.n).sort((a, c) => c.n - a.n)
+    .map(({ b, i, n }) => `<li><button data-i="${i}" aria-pressed="false"><span class="dot" style="--c:${b.color}"></span><span>${b.name}</span><span class="ct">${fmt(n)}</span></button></li>`).join('');
+  applyFilter();
+}
+
+const visible = () => ALL.filter(it => !active.size || active.has(it.b));
+
+function applyFilter() {
+  const vis = visible();
+  layer.clearLayers();
+  vis.forEach(it => layer.addLayer(it.m));
+  panel.classList.toggle('filtering', active.size > 0);
+  brandsEl.querySelectorAll('button').forEach(btn => btn.setAttribute('aria-pressed', active.has(+btn.dataset.i)));
+  statusEl.textContent = active.size ? `${fmt(vis.length)} centres sur ${fmt(ALL.length)}` : `${fmt(ALL.length)} centres en France`;
+  if (q.value) runSearch();
+}
+
+brandsEl.addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  const i = +btn.dataset.i;
+  active.has(i) ? active.delete(i) : active.add(i);
+  applyFilter();
+});
+
+/* Fiche */
+const DAYS = { Mo: 'lun.', Tu: 'mar.', We: 'mer.', Th: 'jeu.', Fr: 'ven.', Sa: 'sam.', Su: 'dim.', PH: 'jours fériés' };
+const hours = h => esc(h).replace('24/7', '24 h/24, 7 j/7').replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH)\b/g, d => DAYS[d]).replace(/\boff\b/g, 'fermé').replace(/\s*;\s*/g, '<br>');
+function host(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } }
+
+function card(it) {
+  const b = BRANDS[it.b], rows = [];
+  if (it.tel) rows.push(['Téléphone', `<a href="tel:${esc(it.tel.split(';')[0].replace(/[^\d+]/g, ''))}">${esc(it.tel)}</a>`]);
+  if (it.web) { const u = /^https?:/i.test(it.web) ? it.web : 'https://' + it.web; rows.push(['Site', `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(host(u))}</a>`]); }
+  if (it.mail) rows.push(['E-mail', `<a href="mailto:${esc(it.mail)}">${esc(it.mail)}</a>`]);
+  if (it.h) rows.push(['Horaires', hours(it.h)]);
+  if (it.siret) rows.push(['SIRET', esc(it.siret)]);
+  const city = [it.p, it.c].filter(Boolean).join(' ');
+  const addr = [it.s, city].filter(Boolean).map(esc).join('<br>') || 'Adresse non renseignée';
+  return `<div class="card">
+    <div class="brand"><span class="dot" style="--c:${b.color}"></span>${b.name}</div>
+    <h2>${esc(it.n)}</h2>
+    <p class="addr">${addr}</p>
+    ${rows.length ? `<dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}
+    <a class="go" href="https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lng}" target="_blank" rel="noopener">Itinéraire</a>
+  </div>`;
+}
+
+/* Recherche tolérante */
+const STOP = new Set(['le', 'la', 'les', 'de', 'du', 'des', 'd', 'l', 'a', 'au', 'aux', 'et', 'en', 'sur', 'un', 'une']);
+const words = s => norm(s).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w && !STOP.has(w));
+
+function lev(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let min = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < min) min = cur[j];
+    }
+    if (min > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+function wordScore(w, toks) {
+  const tol = w.length >= 6 ? 2 : w.length >= 4 ? 1 : 0;
+  let best = 0;
+  for (const t of toks) {
+    if (t === w) return 3;
+    if (t.startsWith(w)) best = 2;
+    else if (tol && !best && (lev(w, t, tol) <= tol || (t.length > w.length && lev(w, t.slice(0, w.length), tol) <= tol))) best = 1;
+  }
+  return best;
+}
+
+let hits = [], sel = 0;
+function runSearch() {
+  const qw = words(q.value);
+  clearBtn.hidden = !q.value;
+  if (!qw.length) { resultsEl.hidden = true; return; }
+  const res = [];
+  for (const it of visible()) {
+    let s = 0, m = 0;
+    for (const w of qw) { const x = wordScore(w, it.tok); if (x) { m++; s += x; } }
+    if (m) res.push({ it, s, m });
+  }
+  const full = res.filter(r => r.m === qw.length), approx = !full.length;
+  hits = (approx ? res : full).sort((a, b) => b.m - a.m || b.s - a.s).slice(0, 8).map(r => r.it);
+  sel = 0;
+  resultsEl.innerHTML = !hits.length ? '<p>Aucun centre ne correspond.</p>'
+    : (approx ? '<p>Résultats approchants</p>' : '') + hits.map((it, i) =>
+      `<button class="res${i === sel ? ' sel' : ''}" role="option" data-i="${i}"><span class="dot" style="--c:${BRANDS[it.b].color}"></span><b>${esc(it.n)}</b><small>${esc([it.s, it.p, it.c].filter(Boolean).join(' ') || BRANDS[it.b].name)}</small></button>`).join('');
+  resultsEl.hidden = false;
+}
+
+function choose(it) {
+  resultsEl.hidden = true;
+  q.blur();
+  map.once('moveend', () => it.m.openPopup());
+  map.flyTo([it.lat, it.lng], Math.max(map.getZoom(), 15), { duration: .8 });
+}
+
+function clearSearch() { q.value = ''; runSearch(); }
+
+q.addEventListener('input', runSearch);
+q.addEventListener('focus', () => q.value && runSearch());
+q.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { clearSearch(); }
+  else if (e.key === 'Enter') { e.preventDefault(); if (hits[sel] && !resultsEl.hidden) choose(hits[sel]); else resultsEl.hidden = true; }
+  else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && hits.length) {
+    e.preventDefault();
+    sel = (sel + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length;
+    resultsEl.querySelectorAll('.res').forEach((el, i) => el.classList.toggle('sel', i === sel));
+  }
+});
+clearBtn.addEventListener('click', () => { clearSearch(); q.focus(); });
+resultsEl.addEventListener('click', e => { const b = e.target.closest('.res'); if (b) choose(hits[+b.dataset.i]); });
+
+/* Panneau repliable */
+function setCollapsed(c) {
+  panel.classList.toggle('collapsed', c);
+  toggle.setAttribute('aria-expanded', !c);
+  toggle.setAttribute('aria-label', c ? 'Déplier la liste des enseignes' : 'Replier la liste des enseignes');
+}
+toggle.addEventListener('click', () => setCollapsed(!panel.classList.contains('collapsed')));
+setCollapsed(innerWidth < 768);
+
+dark.addEventListener('change', setTiles);
+setTiles();
+load();
+</script>
+</body>
+</html>
