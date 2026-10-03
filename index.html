@@ -94,6 +94,7 @@ h1{font-size:1.0625rem;font-weight:600;margin:0;letter-spacing:-.01em}
 .card dt{color:var(--label-2)}
 .card dd{margin:0;overflow-wrap:anywhere}
 .card a{color:var(--accent)}
+.card .go.alt{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);margin-left:var(--space-2)}
 .card .go{display:inline-flex;align-items:center;min-height:44px;padding:0 20px;border-radius:var(--radius-full);background:var(--accent);color:#fff;font-weight:600;text-decoration:none}
 
 @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
@@ -151,7 +152,6 @@ area["ISO3166-1"="FR"][admin_level=2]->.fr;
 );
 out center tags;`;
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
-const CACHE = 'centres-auto-fr-v1', WEEK = 7 * 864e5;
 
 const $ = id => document.getElementById(id);
 const panel = $('panel'), statusEl = $('status'), q = $('q'), clearBtn = $('clear'), resultsEl = $('results'), brandsEl = $('brands'), toggle = $('toggle');
@@ -208,16 +208,19 @@ function parse(json) {
   return out;
 }
 
+let MAJ = '';
 async function load() {
-  statusEl.textContent = 'Interrogation d\u2019OpenStreetMap, jusqu\u2019à une minute la première fois…';
+  statusEl.textContent = 'Chargement des centres…';
   let items = null;
-  try { const c = JSON.parse(localStorage.getItem(CACHE)); if (c && Date.now() - c.t < WEEK) items = c.items; } catch {}
-  if (!items) {
+  try {
+    const d = await (await fetch('centres.json')).json();
+    items = d.items; MAJ = d.maj;
+  } catch {
+    statusEl.textContent = 'Interrogation d\u2019OpenStreetMap, jusqu\u2019à une minute…';
     try {
       const r = await fetch(OVERPASS, { method: 'POST', body: new URLSearchParams({ data: QUERY }) });
       if (!r.ok) throw new Error(r.status);
       items = parse(await r.json());
-      try { localStorage.setItem(CACHE, JSON.stringify({ t: Date.now(), items })); } catch {}
     } catch {
       statusEl.innerHTML = 'OpenStreetMap n\u2019a pas répondu.<button id="retry">Réessayer</button>';
       $('retry').onclick = load;
@@ -231,6 +234,7 @@ function build(items) {
   const stroke = getComputedStyle(document.documentElement).getPropertyValue('--stroke').trim(), r = radius();
   ALL = items;
   for (const it of ALL) {
+    for (const k of ['n', 's', 'p', 'c', 'tel', 'web', 'mail', 'h', 'siret']) it[k] ||= '';
     it.tok = words(`${it.n} ${BRANDS[it.b].name} ${it.s} ${it.p} ${it.c}`);
     it.m = L.circleMarker([it.lat, it.lng], { renderer, radius: r, color: stroke, weight: 1.5, fillColor: BRANDS[it.b].color, fillOpacity: 1 })
       .bindPopup(() => card(it), { minWidth: 240, maxWidth: 300 });
@@ -249,7 +253,7 @@ function applyFilter() {
   vis.forEach(it => layer.addLayer(it.m));
   panel.classList.toggle('filtering', active.size > 0);
   brandsEl.querySelectorAll('button').forEach(btn => btn.setAttribute('aria-pressed', active.has(+btn.dataset.i)));
-  statusEl.textContent = active.size ? `${fmt(vis.length)} centres sur ${fmt(ALL.length)}` : `${fmt(ALL.length)} centres en France`;
+  statusEl.textContent = active.size ? `${fmt(vis.length)} centres sur ${fmt(ALL.length)}` : `${fmt(ALL.length)} centres en France` + (MAJ ? `, à jour au ${new Date(MAJ).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : '');
   if (q.value) runSearch();
 }
 
@@ -280,6 +284,7 @@ function card(it) {
     <p class="addr">${addr}</p>
     ${rows.length ? `<dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}
     <a class="go" href="https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lng}" target="_blank" rel="noopener">Itinéraire</a>
+    <a class="go alt" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${it.lat},${it.lng}" target="_blank" rel="noopener">Voir la façade</a>
   </div>`;
 }
 
