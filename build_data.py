@@ -19,8 +19,10 @@ RX = "Norauto|Feu ?Vert|Speedy|Midas|Point S( |$)|Euromaster|Vulco|Profil( ?Plus
 QUERY = f"""[out:json][timeout:300];
 area["ISO3166-1"="FR"][admin_level=2]->.fr;
 (
-  nwr["brand"~"{RX}",i](area.fr);
-  nwr["shop"~"^(car_repair|tyres|car_parts|car)$"]["name"~"{RX}",i](area.fr);
+  nwr["brand"~"^(Norauto|Feu Vert|Speedy|Midas|Point S|Euromaster|Vulco|Roady|Motrio|Top Garage)$"](area.fr);
+  nwr["shop"="car_repair"]["name"~"{RX}",i](area.fr);
+  nwr["shop"="tyres"]["name"~"{RX}",i](area.fr);
+  nwr["shop"="car_parts"]["name"~"{RX}",i](area.fr);
 );
 out center tags;"""
 
@@ -97,6 +99,8 @@ def atp():
 
 def osm():
     data = json.loads(get(OVERPASS, urllib.parse.urlencode({"data": QUERY}).encode()))
+    if not data.get("elements"):
+        raise RuntimeError(data.get("remark") or "réponse vide")
     out = []
     for e in data["elements"]:
         t = e.get("tags", {})

@@ -23,6 +23,7 @@
 html,body{height:100%;margin:0}
 body{font-family:var(--font-system);color:var(--label);background:var(--bg);-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #map{position:fixed;inset:0}
 
@@ -147,8 +148,10 @@ const RX = 'Norauto|Feu ?Vert|Speedy|Midas|Point S( |$)|Euromaster|Vulco|Profil(
 const QUERY = `[out:json][timeout:180];
 area["ISO3166-1"="FR"][admin_level=2]->.fr;
 (
-  nwr["brand"~"${RX}",i](area.fr);
-  nwr["shop"~"^(car_repair|tyres|car_parts|car)$"]["name"~"${RX}",i](area.fr);
+  nwr["brand"~"^(Norauto|Feu Vert|Speedy|Midas|Point S|Euromaster|Vulco|Roady|Motrio|Top Garage)$"](area.fr);
+  nwr["shop"="car_repair"]["name"~"${RX}",i](area.fr);
+  nwr["shop"="tyres"]["name"~"${RX}",i](area.fr);
+  nwr["shop"="car_parts"]["name"~"${RX}",i](area.fr);
 );
 out center tags;`;
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
@@ -221,6 +224,7 @@ async function load() {
       const r = await fetch(OVERPASS, { method: 'POST', body: new URLSearchParams({ data: QUERY }) });
       if (!r.ok) throw new Error(r.status);
       items = parse(await r.json());
+      if (!items.length) throw new Error('vide');
     } catch {
       statusEl.innerHTML = 'OpenStreetMap n\u2019a pas répondu.<button id="retry">Réessayer</button>';
       $('retry').onclick = load;
