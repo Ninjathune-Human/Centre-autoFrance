@@ -15,7 +15,8 @@ Norauto, Feu Vert, Speedy, Midas, Point S, Euromaster, Vulco, Profil Plus, Roady
 - Un point coloré par centre, couleur par enseigne, sur fond de carte Esri clair ou sombre selon le réglage du système.
 - Fiche au clic : adresse, téléphone, page du centre, e-mail, horaires traduits en français, SIRET, itinéraire et vue de la façade dans Street View.
 - Filtre par enseigne : un clic isole une enseigne, les clics suivants en ajoutent. Sans sélection, tout est affiché.
-- Choix d'une région ou d'un département, et export des centres affichés en CSV (compatible Excel).
+- Volet Filtres : territoire (région ou département), périmètre de 5 à 50 km autour d'un centre choisi depuis sa fiche, enseignes.
+- Volet Liste : centres filtrés, groupés par département ou triés par distance, avec export CSV compatible Excel.
 - Recherche par nom, ville ou code postal, tolérante aux fautes de frappe et à l'ordre des mots.
 - Interface adaptée au PC, à l'iPad et à l'iPhone, au tactile comme au stylet.
 
