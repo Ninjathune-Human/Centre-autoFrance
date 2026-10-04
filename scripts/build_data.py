@@ -14,7 +14,9 @@ SPIDERS = {"norauto_fr": "Norauto", "feu_vert_fr": "Feu Vert", "speedy_fr_ma": "
            "point_s_fr": "Point S", "euromaster_fr": "Euromaster", "motrio": "Motrio", "top_garage_fr": "Top Garage"}
 FRANCE = {"FR", "GP", "MQ", "GF", "RE", "YT", "PM", "BL", "MF"}
 ATP = "https://data.alltheplaces.xyz"
-OVERPASS = "https://overpass-api.de/api/interpreter"
+OVERPASS = ["https://overpass-api.de/api/interpreter",  # serveur principal, puis miroirs mondiaux
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+            "https://overpass.private.coffee/api/interpreter"]
 DEPTS = "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson"
 DOM = {"971": (15.8, 16.6, -61.9, -60.9), "972": (14.3, 14.95, -61.3, -60.75), "973": (2.0, 6.0, -54.7, -51.5),
        "974": (-21.5, -20.8, 55.1, 55.9), "976": (-13.1, -12.6, 44.9, 45.4)}
@@ -101,16 +103,17 @@ def atp():
 
 
 def osm():
-    for attempt in (1, 2):
+    for attempt, url in enumerate(OVERPASS * 2):
         try:
-            data = json.loads(get(OVERPASS, urllib.parse.urlencode({"data": QUERY}).encode()))
+            data = json.loads(get(url, urllib.parse.urlencode({"data": QUERY}).encode()))
             if not data.get("elements"):
                 raise RuntimeError(data.get("remark") or "réponse vide")
             break
-        except Exception:
-            if attempt == 2:
+        except Exception as e:
+            print(f"Overpass {url} : {e}")
+            if attempt == len(OVERPASS) * 2 - 1:
                 raise
-            time.sleep(60)
+            time.sleep(30)
     out = []
     for e in data["elements"]:
         t = e.get("tags", {})
