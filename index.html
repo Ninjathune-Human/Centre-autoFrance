@@ -56,6 +56,10 @@ h1{font-size:1.0625rem;font-weight:600;margin:0;letter-spacing:-.01em}
 .search input::placeholder{color:var(--label-3)}
 #clear{width:36px;height:36px;margin-right:4px}
 
+.tools{display:flex;gap:var(--space-2);margin-top:var(--space-2)}
+.tools select{flex:1;min-width:0;height:44px;padding:0 36px 0 var(--space-3);border:0;border-radius:var(--radius-md);background:var(--fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center;color:var(--label);font:1rem var(--font-system);-webkit-appearance:none;appearance:none;color-scheme:light dark;cursor:pointer}
+#export{display:flex;align-items:center;gap:6px;height:44px;padding:0 var(--space-3);border-radius:var(--radius-md);background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-weight:600}
+#export:disabled{opacity:.38;cursor:default}
 #results{margin-top:var(--space-1);overflow:auto;min-height:0;flex:0 1 auto}
 #results p{margin:0;padding:var(--space-2) var(--space-3);font-size:.8125rem;color:var(--label-2)}
 .res{display:grid;grid-template-columns:10px 1fr;column-gap:var(--space-3);align-items:center;width:100%;min-height:44px;padding:6px var(--space-3);border-radius:var(--radius-md);text-align:left;box-sizing:border-box}
@@ -122,6 +126,12 @@ h1{font-size:1.0625rem;font-weight:600;margin:0;letter-spacing:-.01em}
     </button>
   </div>
   <div id="results" role="listbox" hidden></div>
+  <div class="tools">
+    <select id="zone" aria-label="Territoire"></select>
+    <button id="export" aria-label="Exporter les centres affichés en CSV">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>Exporter
+    </button>
+  </div>
   <div class="wrap"><ul id="brands"></ul></div>
   <p class="src">Données © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">contributeurs OpenStreetMap</a>, licence ODbL</p>
 </section>
@@ -144,6 +154,26 @@ const BRANDS = [
   ['Top Garage',  /top ?garage/,            '#5C6BC0']
 ].map(([name, re, color]) => ({ name, re, color }));
 
+const REGIONS = {
+  'Auvergne-Rhône-Alpes': { '01': 'Ain', '03': 'Allier', '07': 'Ardèche', '15': 'Cantal', '26': 'Drôme', '38': 'Isère', '42': 'Loire', '43': 'Haute-Loire', '63': 'Puy-de-Dôme', '69': 'Rhône', '73': 'Savoie', '74': 'Haute-Savoie' },
+  'Bourgogne-Franche-Comté': { '21': 'Côte-d\'Or', '25': 'Doubs', '39': 'Jura', '58': 'Nièvre', '70': 'Haute-Saône', '71': 'Saône-et-Loire', '89': 'Yonne', '90': 'Territoire de Belfort' },
+  'Bretagne': { '22': 'Côtes-d\'Armor', '29': 'Finistère', '35': 'Ille-et-Vilaine', '56': 'Morbihan' },
+  'Centre-Val de Loire': { '18': 'Cher', '28': 'Eure-et-Loir', '36': 'Indre', '37': 'Indre-et-Loire', '41': 'Loir-et-Cher', '45': 'Loiret' },
+  'Corse': { '2A': 'Corse-du-Sud', '2B': 'Haute-Corse' },
+  'Grand Est': { '08': 'Ardennes', '10': 'Aube', '51': 'Marne', '52': 'Haute-Marne', '54': 'Meurthe-et-Moselle', '55': 'Meuse', '57': 'Moselle', '67': 'Bas-Rhin', '68': 'Haut-Rhin', '88': 'Vosges' },
+  'Hauts-de-France': { '02': 'Aisne', '59': 'Nord', '60': 'Oise', '62': 'Pas-de-Calais', '80': 'Somme' },
+  'Île-de-France': { '75': 'Paris', '77': 'Seine-et-Marne', '78': 'Yvelines', '91': 'Essonne', '92': 'Hauts-de-Seine', '93': 'Seine-Saint-Denis', '94': 'Val-de-Marne', '95': 'Val-d\'Oise' },
+  'Normandie': { '14': 'Calvados', '27': 'Eure', '50': 'Manche', '61': 'Orne', '76': 'Seine-Maritime' },
+  'Nouvelle-Aquitaine': { '16': 'Charente', '17': 'Charente-Maritime', '19': 'Corrèze', '23': 'Creuse', '24': 'Dordogne', '33': 'Gironde', '40': 'Landes', '47': 'Lot-et-Garonne', '64': 'Pyrénées-Atlantiques', '79': 'Deux-Sèvres', '86': 'Vienne', '87': 'Haute-Vienne' },
+  'Occitanie': { '09': 'Ariège', '11': 'Aude', '12': 'Aveyron', '30': 'Gard', '31': 'Haute-Garonne', '32': 'Gers', '34': 'Hérault', '46': 'Lot', '48': 'Lozère', '65': 'Hautes-Pyrénées', '66': 'Pyrénées-Orientales', '81': 'Tarn', '82': 'Tarn-et-Garonne' },
+  'Pays de la Loire': { '44': 'Loire-Atlantique', '49': 'Maine-et-Loire', '53': 'Mayenne', '72': 'Sarthe', '85': 'Vendée' },
+  'Provence-Alpes-Côte d\'Azur': { '04': 'Alpes-de-Haute-Provence', '05': 'Hautes-Alpes', '06': 'Alpes-Maritimes', '13': 'Bouches-du-Rhône', '83': 'Var', '84': 'Vaucluse' },
+  'Outre-mer': { '971': 'Guadeloupe', '972': 'Martinique', '973': 'Guyane', '974': 'La Réunion', '976': 'Mayotte' }
+};
+const DEPT = {};
+for (const [r, ds] of Object.entries(REGIONS)) for (const [c, n] of Object.entries(ds)) DEPT[c] = { n, r };
+const depOf = p => !/^\d{5}$/.test(p) ? '' : p.startsWith('97') ? p.slice(0, 3) : p.startsWith('20') ? (p < '20200' ? '2A' : '2B') : p.slice(0, 2);
+const FRANCE = [[41.3, -5.2], [51.1, 9.6]];
 const RX = 'Norauto|Feu ?Vert|Speedy|Midas|Point S( |$)|Euromaster|Vulco|Profil( ?Plus|[+])|Roady|Carter.?Cash|Eurorepar|Motrio|Top ?Garage';
 const QUERY = `[out:json][timeout:180];
 area["ISO3166-1"="FR"][admin_level=2]->.fr;
@@ -164,7 +194,7 @@ const fmt = n => n.toLocaleString('fr-FR');
 const dark = matchMedia('(prefers-color-scheme: dark)');
 
 /* Carte */
-const map = L.map('map', { zoomControl: false, attributionControl: false, minZoom: 3 }).fitBounds([[41.3, -5.2], [51.1, 9.6]]);
+const map = L.map('map', { zoomControl: false, attributionControl: false, minZoom: 3 }).fitBounds(FRANCE);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 L.control.attribution({ prefix: '<a href="https://leafletjs.com">Leaflet</a>' }).addTo(map);
 const renderer = L.canvas({ padding: .5, tolerance: 8 });
@@ -239,6 +269,7 @@ function build(items) {
   ALL = items;
   for (const it of ALL) {
     for (const k of ['n', 's', 'p', 'c', 'tel', 'web', 'mail', 'h', 'siret']) it[k] ||= '';
+    it.d ||= depOf(it.p);
     it.tok = words(`${it.n} ${BRANDS[it.b].name} ${it.s} ${it.p} ${it.c}`);
     it.m = L.circleMarker([it.lat, it.lng], { renderer, radius: r, color: stroke, weight: 1.5, fillColor: BRANDS[it.b].color, fillOpacity: 1 })
       .bindPopup(() => card(it), { minWidth: 240, maxWidth: 300 });
@@ -249,15 +280,21 @@ function build(items) {
   applyFilter();
 }
 
-const visible = () => ALL.filter(it => !active.size || active.has(it.b));
+let zone = null;
+const inZone = it => !zone || zone.has(it.d);
+const visible = () => ALL.filter(it => inZone(it) && (!active.size || active.has(it.b)));
 
 function applyFilter() {
-  const vis = visible();
+  const vis = visible(), local = ALL.filter(inZone);
   layer.clearLayers();
   vis.forEach(it => layer.addLayer(it.m));
   panel.classList.toggle('filtering', active.size > 0);
-  brandsEl.querySelectorAll('button').forEach(btn => btn.setAttribute('aria-pressed', active.has(+btn.dataset.i)));
-  statusEl.textContent = active.size ? `${fmt(vis.length)} centres sur ${fmt(ALL.length)}` : `${fmt(ALL.length)} centres en France` + (MAJ ? `, à jour au ${new Date(MAJ).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : '');
+  brandsEl.querySelectorAll('button').forEach(btn => {
+    btn.setAttribute('aria-pressed', active.has(+btn.dataset.i));
+    btn.querySelector('.ct').textContent = fmt(local.filter(it => it.b === +btn.dataset.i).length);
+  });
+  $('export').disabled = !vis.length;
+  statusEl.textContent = active.size || zone ? `${fmt(vis.length)} centres sur ${fmt(ALL.length)}` : `${fmt(ALL.length)} centres en France` + (MAJ ? `, à jour au ${new Date(MAJ).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : '');
   if (q.value) runSearch();
 }
 
@@ -266,6 +303,33 @@ brandsEl.addEventListener('click', e => {
   const i = +btn.dataset.i;
   active.has(i) ? active.delete(i) : active.add(i);
   applyFilter();
+});
+
+/* Territoire et export */
+const zoneSel = $('zone');
+zoneSel.innerHTML = '<option value="">Toute la France</option>' + Object.entries(REGIONS).map(([r, ds]) =>
+  `<optgroup label="${r}"><option value="${r}">${r === 'Outre-mer' ? 'Tout l\u2019outre-mer' : 'Toute la région'}</option>` +
+  Object.entries(ds).map(([c, n]) => `<option value="${c}">${c} ${n}</option>`).join('') + '</optgroup>').join('');
+
+zoneSel.addEventListener('change', () => {
+  const v = zoneSel.value;
+  zone = !v ? null : new Set(REGIONS[v] ? Object.keys(REGIONS[v]) : [v]);
+  applyFilter();
+  const pts = visible().map(it => [it.lat, it.lng]);
+  const pad = innerWidth > 640 ? [panel.offsetWidth + 32, 24] : [24, panel.offsetHeight + 24];
+  map.fitBounds(zone && pts.length ? pts : FRANCE, { paddingTopLeft: pad, paddingBottomRight: [24, 24], maxZoom: 12 });
+});
+
+$('export').addEventListener('click', () => {
+  const head = ['Enseigne', 'Nom', 'Adresse', 'Code postal', 'Ville', 'Département', 'Région', 'Téléphone', 'Site web', 'E-mail', 'Horaires', 'SIRET', 'Latitude', 'Longitude'];
+  const rows = visible().map(it => [BRANDS[it.b].name, it.n, it.s, it.p, it.c, it.d && DEPT[it.d] ? `${it.d} ${DEPT[it.d].n}` : '', DEPT[it.d]?.r || '', it.tel, it.web, it.mail, it.h, it.siret, it.lat, it.lng]);
+  const csv = [head, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+  const v = zoneSel.value, label = !v ? 'France' : REGIONS[v] ? v : `${v} ${DEPT[v].n}`;
+  a.download = `centres-auto-${norm(label).replace(/[^a-z0-9]+/g, '-')}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
 /* Fiche */
